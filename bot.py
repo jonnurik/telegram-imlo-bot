@@ -17,7 +17,7 @@ if not TOKEN:
 
 
 # =========================
-# O'zbek lug‘at
+# SPELLCHECKER (offline)
 # =========================
 spell = SpellChecker(language=None)
 spell.word_frequency.load_text_file("uzbek_50k_dictionary.txt")
@@ -27,11 +27,11 @@ spell.word_frequency.load_text_file("uzbek_50k_dictionary.txt")
 # /start
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Bot faqat guruhlarda ishlaydi.")
+    await update.message.reply_text("Imlo bot ishlayapti (bepul offline).")
 
 
 # =========================
-# GROUP CHECKER (BEPUl)
+# GROUP CHECK
 # =========================
 async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -44,7 +44,6 @@ async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not mistakes:
         return  # jim
 
-    # faqat 1 ta eng yaqin xato
     wrong = list(mistakes)[0]
     correct = spell.correction(wrong)
 
@@ -52,7 +51,7 @@ async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =========================
-# main
+# MAIN
 # =========================
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
@@ -66,4 +65,9 @@ def main():
         )
     )
 
-    print("Bepul imlo bot ishga tushdi
+    print("Bepul imlo bot ishga tushdi...")
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
