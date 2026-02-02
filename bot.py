@@ -1,6 +1,4 @@
 import os
-import re
-from spellchecker import SpellChecker
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -9,87 +7,84 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+from openai import OpenAI
+
 
 TOKEN = os.getenv("BOT_TOKEN")
+OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 
 if not TOKEN:
-    raise ValueError("BOT_TOKEN environment variable topilmadi!")
+    raise ValueError("BOT_TOKEN topilmadi")
+
+if not OPENAI_KEY:
+    raise ValueError("OPENAI_API_KEY topilmadi")
+
+client = OpenAI(api_key=OPENAI_KEY)
 
 
 # =========================
-# SPELLCHECKER (50k lug'at)
+# AI tekshiruvchi funksiya
 # =========================
-spell = SpellChecker(language=None)
-spell.word_frequency.load_text_file("uzbek_50k_dictionary.txt")
+async def ai_check(sentence: str):
+
+    prompt = f"""
+Quyidagi o‘zbek gapni tekshir.
+Agar xato bo‘lsa faqat 1 ta eng muhim xatoni chiqar.
+
+Format:
+xato → togri
+
+Agar xato bo‘lmasa:
+OK
+
+Gap: {sentence}
+"""
+
+    res = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0
+    )
+
+    return res.choices[0].message.content.strip()
 
 
 # =========================
-# PRIVATE /start
+# /start (private)
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Bot faqat guruhda ishlaydi.")
+    await update.message.reply_text("Bot faqat guruhlarda ishlaydi.")
 
 
 # =========================
-# SMART CHECK (1 ta eng yaxshi tuzatish)
+# group xabar tekshirish
 # =========================
-async def check_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if not update.message or not update.message.text:
-        return
+async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # faqat group
     if update.effective_chat.type == "private":
         return
 
-    text = update.message.text.lower()
-    words = re.findall(r"[a-zʻ’']+", text)
+    text = update.message.text
 
-    mistakes = spell.unknown(words)
+    result = await ai_check(text)
 
-    # xato yo'q → jim
-    if not mistakes:
+    if result == "OK":
         return
 
-    best_word = None
-    best_fix = None
-    best_score = 999
-
-    # 🔥 ENG MUHIM QISM
-    # eng kichik tahrir masofali (eng mantiqiy) tuzatishni tanlaymiz
-    for w in mistakes:
-        fix = spell.correction(w)
-
-        if not fix:
-            continue
-
-        distance = abs(len(w) - len(fix))  # oddiy kontekst ball
-
-        if distance < best_score:
-            best_score = distance
-            best_word = w
-            best_fix = fix
-
-    if best_word:
-        await update.message.reply_text(f"❌ {best_word} → {best_fix}")
+    await update.message.reply_text(f"❌ {result}")
 
 
 # =========================
-# MAIN
+# main
 # =========================
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check))
 
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
-            check_text
-        )
-    )
-
-    print("Bot ishga tushdi...")
+    print("AI bot ishga tushdi...")
     app.run_polling()
 
 
