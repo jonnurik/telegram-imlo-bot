@@ -12,6 +12,9 @@ from telegram.ext import (
 
 TOKEN = os.getenv("BOT_TOKEN")
 
+if not TOKEN:
+    raise ValueError("BOT_TOKEN environment variable topilmadi!")
+
 spell = SpellChecker()
 
 
@@ -20,12 +23,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def check_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+
     text = update.message.text
     words = re.findall(r"[A-Za-z']+", text.lower())
 
     mistakes = spell.unknown(words)
 
     if not mistakes:
+        await update.message.reply_text("✅ Xatolar topilmadi")
         return
 
     msg = "❌ Xato so‘zlar:\n"
