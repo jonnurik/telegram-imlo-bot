@@ -15,7 +15,9 @@ TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
     raise ValueError("BOT_TOKEN environment variable topilmadi!")
 
-spell = SpellChecker()
+# 🔥 MUHIM: shu yerda yuklanadi
+spell = SpellChecker(language=None)
+spell.word_frequency.load_text_file("uzbek_50k_dictionary.txt")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
