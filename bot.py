@@ -47,6 +47,5 @@ def main():
     app.run_polling()
 
 
-# ⭐ ENG MUHIM QISMI
 if __name__ == "__main__":
     main()
