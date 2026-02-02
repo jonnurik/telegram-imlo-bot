@@ -1,5 +1,6 @@
 import os
-import asyncio
+import re
+from spellchecker import SpellChecker
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -8,67 +9,46 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
-from openai import OpenAI
-
 
 TOKEN = os.getenv("BOT_TOKEN")
-OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 
-client = OpenAI(api_key=OPENAI_KEY)
-
-
-# =========================
-# AI check (async-safe)
-# =========================
-async def ai_check(sentence: str):
-
-    prompt = f"""
-Quyidagi o‘zbek gapni tekshir.
-Agar xato bo‘lsa faqat 1 ta eng muhim xatoni chiqar.
-
-Format:
-xato → togri
-
-Agar xato bo‘lmasa:
-OK
-
-Gap: {sentence}
-"""
-
-    loop = asyncio.get_event_loop()
-
-    res = await loop.run_in_executor(
-        None,
-        lambda: client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0
-        )
-    )
-
-    return res.choices[0].message.content.strip()
+if not TOKEN:
+    raise ValueError("BOT_TOKEN topilmadi")
 
 
 # =========================
-# start (private)
+# O'zbek lug‘at
+# =========================
+spell = SpellChecker(language=None)
+spell.word_frequency.load_text_file("uzbek_50k_dictionary.txt")
+
+
+# =========================
+# /start
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Bot faqat guruhlarda ishlaydi.")
 
 
 # =========================
-# group only handler
+# GROUP CHECKER (BEPUl)
 # =========================
 async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    text = update.message.text
+    text = update.message.text.lower()
 
-    result = await ai_check(text)
+    words = re.findall(r"[a-zʻ’']+", text)
 
-    if result == "OK":
-        return
+    mistakes = spell.unknown(words)
 
-    await update.message.reply_text(f"❌ {result}")
+    if not mistakes:
+        return  # jim
+
+    # faqat 1 ta eng yaqin xato
+    wrong = list(mistakes)[0]
+    correct = spell.correction(wrong)
+
+    await update.message.reply_text(f"❌ {wrong} → {correct}")
 
 
 # =========================
@@ -77,10 +57,8 @@ async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # start faqat private
     app.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
 
-    # 🔥 FAQAT GROUP
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
@@ -88,9 +66,4 @@ def main():
         )
     )
 
-    print("AI bot ishga tushdi...")
-    app.run_polling()
-
-
-if __name__ == "__main__":
-    main()
+    print("Bepul imlo bot ishga tushdi
