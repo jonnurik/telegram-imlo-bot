@@ -1,4 +1,5 @@
 import os
+import asyncio
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -13,17 +14,11 @@ from openai import OpenAI
 TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 
-if not TOKEN:
-    raise ValueError("BOT_TOKEN topilmadi")
-
-if not OPENAI_KEY:
-    raise ValueError("OPENAI_API_KEY topilmadi")
-
 client = OpenAI(api_key=OPENAI_KEY)
 
 
 # =========================
-# AI tekshiruvchi funksiya
+# AI check (async-safe)
 # =========================
 async def ai_check(sentence: str):
 
@@ -40,30 +35,31 @@ OK
 Gap: {sentence}
 """
 
-    res = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0
+    loop = asyncio.get_event_loop()
+
+    res = await loop.run_in_executor(
+        None,
+        lambda: client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0
+        )
     )
 
     return res.choices[0].message.content.strip()
 
 
 # =========================
-# /start (private)
+# start (private)
 # =========================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Bot faqat guruhlarda ishlaydi.")
 
 
 # =========================
-# group xabar tekshirish
+# group only handler
 # =========================
 async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    # faqat group
-    if update.effective_chat.type == "private":
-        return
 
     text = update.message.text
 
@@ -81,8 +77,16 @@ async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check))
+    # start faqat private
+    app.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
+
+    # 🔥 FAQAT GROUP
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS,
+            check
+        )
+    )
 
     print("AI bot ishga tushdi...")
     app.run_polling()
