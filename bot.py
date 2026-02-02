@@ -10,26 +10,44 @@ from telegram.ext import (
     filters,
 )
 
+# ==============================
+# TOKEN
+# ==============================
 TOKEN = os.getenv("BOT_TOKEN")
 
 if not TOKEN:
     raise ValueError("BOT_TOKEN environment variable topilmadi!")
 
-# 🔥 MUHIM: shu yerda yuklanadi
+
+# ==============================
+# SPELLCHECKER (O'zbek lug‘at)
+# ==============================
 spell = SpellChecker(language=None)
+
+# 🔥 siz yuklagan fayl shu yerda o‘qiladi
 spell.word_frequency.load_text_file("uzbek_50k_dictionary.txt")
 
 
+# ==============================
+# COMMAND: /start
+# ==============================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("✅ Bot ishlayapti. Matn yuboring.")
+    await update.message.reply_text(
+        "✅ Bot ishlayapti.\nMatn yuboring — imlo xatolarini tekshiraman."
+    )
 
 
+# ==============================
+# TEXT CHECKER
+# ==============================
 async def check_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
-    text = update.message.text
-    words = re.findall(r"[A-Za-z']+", text.lower())
+    text = update.message.text.lower()
+
+    # faqat so‘zlarni ajratib olish
+    words = re.findall(r"[a-zʻ’']+", text)
 
     mistakes = spell.unknown(words)
 
@@ -40,12 +58,16 @@ async def check_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = "❌ Xato so‘zlar:\n"
 
     for w in mistakes:
-        sug = ", ".join(list(spell.candidates(w))[:3])
+        suggestions = list(spell.candidates(w))[:3]
+        sug = ", ".join(suggestions)
         msg += f"\n{w} → {sug}"
 
     await update.message.reply_text(msg)
 
 
+# ==============================
+# MAIN
+# ==============================
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
